@@ -6,11 +6,14 @@ import (
 )
 
 // Item represents a record in the cache map
+type EvictCallback func(key string, value interface{})
+
 type Item struct {
 	sync.RWMutex
-	data    interface{}
-	expires *time.Time
-	ttl     time.Duration
+	data     interface{}
+	expires  *time.Time
+	ttl      time.Duration
+	on_evict EvictCallback
 }
 
 func (item *Item) touch() {

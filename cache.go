@@ -13,9 +13,9 @@ type Cache struct {
 }
 
 // Set is a thread-safe way to add new items to the map
-func (cache *Cache) Set(key string, data interface{}, ttl time.Duration) {
+func (cache *Cache) Set(key string, data interface{}, ttl time.Duration, on_evict EvictCallback) {
 	cache.mutex.Lock()
-	item := &Item{data: data, ttl: ttl}
+	item := &Item{data: data, ttl: ttl, on_evict: on_evict}
 	item.touch()
 	cache.items[key] = item
 	cache.mutex.Unlock()
@@ -58,6 +58,9 @@ func (cache *Cache) cleanup() {
 	cache.mutex.Lock()
 	for key, item := range cache.items {
 		if item.expired() {
+			if item.on_evict != nil {
+				item.on_evict(key, item.data)
+			}
 			delete(cache.items, key)
 		}
 	}
@@ -85,6 +88,10 @@ func (cache *Cache) startCleanupTimer() {
 func (cache *Cache) CleanAll() {
 	cache.mutex.Lock()
 	for key, _ := range cache.items {
+		item := cache.items[key]
+		if item.on_evict != nil {
+			item.on_evict(key, item.data)
+		}
 		delete(cache.items, key)
 	}
 	cache.mutex.Unlock()
@@ -92,6 +99,10 @@ func (cache *Cache) CleanAll() {
 
 func (cache *Cache) Delete(key string) {
 	cache.mutex.Lock()
+	item := cache.items[key]
+	if item.on_evict != nil {
+		item.on_evict(key, item.data)
+	}
 	delete(cache.items, key)
 	cache.mutex.Unlock()
 }
